@@ -1,0 +1,155 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id        String   @id @default(cuid())
+  clerkId   String   @unique
+  email     String
+  name      String?
+  location  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  policies                Policy[]
+  endorsements            Endorsement[]
+  petitionSignatures      PetitionSignature[]
+  comments                Comment[]
+  organizationMemberships OrganizationMember[]
+
+  @@index([clerkId])
+}
+
+model Policy {
+  id                 String    @id @default(cuid())
+  title              String
+  content            String    @db.Text
+  summary            String?   @db.Text
+  jurisdiction       String?
+  category           String?
+  targetLawText      String?   @db.Text
+  targetLawName      String?
+  readabilityScore   Float?
+  potentialConflicts String?   @db.Text
+  affectedGroups     String?
+  published          Boolean   @default(false)
+  publishedAt        DateTime?
+  deletedAt          DateTime?
+  viewCount          Int       @default(0)
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  authorId String
+  author   User @relation(fields: [authorId], references: [id])
+
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id])
+
+  endorsements       Endorsement[]
+  petitionSignatures PetitionSignature[]
+  comments           Comment[]
+
+  @@index([authorId])
+  @@index([published])
+  @@index([organizationId])
+}
+
+model Endorsement {
+  id        String   @id @default(cuid())
+  type      String   @default("individual")
+  statement String?  @db.Text
+  createdAt DateTime @default(now())
+
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id])
+
+  policyId String
+  policy   Policy @relation(fields: [policyId], references: [id])
+
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id])
+
+  @@unique([userId, policyId])
+  @@unique([organizationId, policyId])
+  @@index([policyId])
+  @@index([organizationId])
+}
+
+model PetitionSignature {
+  id                String   @id @default(cuid())
+  policyId          String
+  policy            Policy   @relation(fields: [policyId], references: [id], onDelete: Cascade)
+  userId            String
+  user              User     @relation(fields: [userId], references: [id])
+
+  emailVerified     Boolean  @default(false)
+  verificationToken String?  @unique
+
+  fullName          String
+  location          String?
+
+  createdAt         DateTime @default(now())
+
+  @@unique([policyId, userId])
+  @@index([policyId])
+}
+
+model Comment {
+  id        String    @id @default(cuid())
+  policyId  String
+  policy    Policy    @relation(fields: [policyId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User      @relation(fields: [userId], references: [id])
+
+  content   String    @db.Text
+
+  parentId  String?
+  parent    Comment?  @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies   Comment[] @relation("CommentReplies")
+
+  upvotes   Int       @default(0)
+  downvotes Int       @default(0)
+
+  deletedAt DateTime?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@index([policyId])
+  @@index([parentId])
+}
+
+model Organization {
+  id          String   @id @default(cuid())
+  name        String
+  description String?  @db.Text
+  website     String?
+  logoUrl     String?
+  verified    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  policies     Policy[]
+  endorsements Endorsement[]
+  members      OrganizationMember[]
+}
+
+model OrganizationMember {
+  id        String   @id @default(cuid())
+  role      String   @default("member")
+  createdAt DateTime @default(now())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+
+  @@unique([userId, organizationId])
+  @@index([organizationId])
+}
