@@ -47,29 +47,41 @@ export async function GET(
       );
     }
 
-    // Check if current user is a member
+    // Check if current user is a member or has a pending request
     let membership = null;
+    let pendingRequest = null;
     try {
       const { userId: clerkId } = await auth();
       if (clerkId) {
         const dbUser = await prisma.user.findUnique({ where: { clerkId } });
         if (dbUser) {
-          membership = await prisma.organizationMember.findUnique({
-            where: {
-              userId_organizationId: {
-                userId: dbUser.id,
-                organizationId: id,
+          [membership, pendingRequest] = await Promise.all([
+            prisma.organizationMember.findUnique({
+              where: {
+                userId_organizationId: {
+                  userId: dbUser.id,
+                  organizationId: id,
+                },
               },
-            },
-            select: { role: true },
-          });
+              select: { role: true },
+            }),
+            prisma.accessRequest.findUnique({
+              where: {
+                userId_organizationId: {
+                  userId: dbUser.id,
+                  organizationId: id,
+                },
+              },
+              select: { status: true },
+            }),
+          ]);
         }
       }
     } catch {
       // Auth not available, that's fine
     }
 
-    return NextResponse.json({ organization, membership });
+    return NextResponse.json({ organization, membership, pendingRequest });
   } catch (error) {
     console.error("GET /api/organizations/[id] error:", error);
     return NextResponse.json(

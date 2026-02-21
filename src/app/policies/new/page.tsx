@@ -1,30 +1,13 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
-const CATEGORIES = [
-  "Housing",
-  "Healthcare",
-  "Education",
-  "Environment",
-  "Transportation",
-  "Criminal Justice",
-  "Economic Policy",
-  "Civil Rights",
-  "Other",
-];
-
-const US_STATES = [
-  "Alabama","Alaska","Arizona","Arkansas","California","Colorado","Connecticut",
-  "Delaware","Florida","Georgia","Hawaii","Idaho","Illinois","Indiana","Iowa",
-  "Kansas","Kentucky","Louisiana","Maine","Maryland","Massachusetts","Michigan",
-  "Minnesota","Mississippi","Missouri","Montana","Nebraska","Nevada",
-  "New Hampshire","New Jersey","New Mexico","New York","North Carolina",
-  "North Dakota","Ohio","Oklahoma","Oregon","Pennsylvania","Rhode Island",
-  "South Carolina","South Dakota","Tennessee","Texas","Utah","Vermont",
-  "Virginia","Washington","West Virginia","Wisconsin","Wyoming",
-];
+interface OrgOption {
+  id: string;
+  name: string;
+}
 
 interface AnalysisResult {
   readabilityScore: number;
@@ -34,6 +17,7 @@ interface AnalysisResult {
   missingElements: string[];
   suggestions: string[];
   summary: string;
+  category: string;
 }
 
 function Spinner({ className = "h-4 w-4" }: { className?: string }) {
@@ -73,9 +57,8 @@ export default function NewPolicyPage() {
 
   // Form state
   const [title, setTitle] = useState("");
-  const [category, setCategory] = useState("");
-  const [jurisdictionType, setJurisdictionType] = useState("");
-  const [jurisdictionDetail, setJurisdictionDetail] = useState("");
+  const [orgId, setOrgId] = useState("");
+  const [userOrgs, setUserOrgs] = useState<OrgOption[]>([]);
   const [content, setContent] = useState("");
   const [hasExistingLaw, setHasExistingLaw] = useState(false);
   const [targetLawName, setTargetLawName] = useState("");
@@ -91,12 +74,14 @@ export default function NewPolicyPage() {
   const [publishError, setPublishError] = useState("");
   const [showConfirm, setShowConfirm] = useState(false);
 
-  const jurisdiction =
-    jurisdictionType === "Federal"
-      ? "Federal"
-      : jurisdictionDetail
-        ? `${jurisdictionType} - ${jurisdictionDetail}`
-        : jurisdictionType;
+  useEffect(() => {
+    fetch("/api/organizations?membership=member")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (data?.organizations) setUserOrgs(data.organizations);
+      })
+      .catch(() => {});
+  }, []);
 
   async function handleAnalyze() {
     setAnalysisError("");
@@ -145,12 +130,12 @@ export default function NewPolicyPage() {
         body: JSON.stringify({
           title: title.trim(),
           content: content.trim(),
-          category: category || null,
-          jurisdiction: jurisdiction || null,
+          organizationId: orgId || null,
           targetLawName: hasExistingLaw ? targetLawName.trim() || null : null,
           targetLawText: hasExistingLaw ? targetLawText.trim() || null : null,
           analysisResults: analysis
             ? {
+                category: analysis.category,
                 readabilityScore: analysis.readabilityScore,
                 summary: analysis.summary,
                 potentialConflicts: analysis.potentialConflicts,
@@ -179,6 +164,7 @@ export default function NewPolicyPage() {
   const canPublish =
     title.trim().length > 0 &&
     content.trim().length >= 100 &&
+    orgId.length > 0 &&
     analysis !== null &&
     !isPublishing;
 
@@ -225,81 +211,39 @@ export default function NewPolicyPage() {
               </p>
             </div>
 
-            {/* Category */}
+            {/* Organization (jurisdiction) */}
             <div>
               <label
-                htmlFor="category"
+                htmlFor="org-select"
                 className="mb-1 block text-sm font-medium text-gray-700"
               >
-                Category
+                Organization <span className="text-red-500">*</span>
               </label>
-              <select
-                id="category"
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-                className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">Select a category...</option>
-                {CATEGORIES.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Jurisdiction */}
-            <div>
-              <label
-                htmlFor="jurisdiction-type"
-                className="mb-1 block text-sm font-medium text-gray-700"
-              >
-                Jurisdiction
-              </label>
-              <select
-                id="jurisdiction-type"
-                value={jurisdictionType}
-                onChange={(e) => {
-                  setJurisdictionType(e.target.value);
-                  setJurisdictionDetail("");
-                }}
-                className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">Select jurisdiction...</option>
-                <option value="Federal">Federal</option>
-                <option value="State">State</option>
-                <option value="County">County</option>
-                <option value="City">City</option>
-              </select>
-
-              {jurisdictionType === "State" && (
+              {userOrgs.length === 0 ? (
+                <p className="text-sm text-gray-500">
+                  You must be a member of an organization to publish a policy.{" "}
+                  <Link href="/organizations" className="text-blue-600 hover:underline">
+                    Browse organizations
+                  </Link>
+                </p>
+              ) : (
                 <select
-                  id="jurisdiction-state"
-                  value={jurisdictionDetail}
-                  onChange={(e) => setJurisdictionDetail(e.target.value)}
-                  aria-label="Select state"
-                  className="mt-2 w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  id="org-select"
+                  value={orgId}
+                  onChange={(e) => setOrgId(e.target.value)}
+                  className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
-                  <option value="">Select state...</option>
-                  {US_STATES.map((s) => (
-                    <option key={s} value={s}>
-                      {s}
+                  <option value="">Select organization...</option>
+                  {userOrgs.map((org) => (
+                    <option key={org.id} value={org.id}>
+                      {org.name}
                     </option>
                   ))}
                 </select>
               )}
-
-              {(jurisdictionType === "County" ||
-                jurisdictionType === "City") && (
-                <input
-                  type="text"
-                  value={jurisdictionDetail}
-                  onChange={(e) => setJurisdictionDetail(e.target.value)}
-                  placeholder={`Enter ${jurisdictionType.toLowerCase()} name...`}
-                  aria-label={`${jurisdictionType} name`}
-                  className="mt-2 w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              )}
+              <p className="mt-1 text-xs text-gray-400">
+                Category will be assigned automatically by AI during the pre-publish check.
+              </p>
             </div>
           </fieldset>
 
@@ -525,6 +469,16 @@ function AnalysisResults({ analysis }: { analysis: AnalysisResult }) {
           Level: {analysis.readabilityLevel}
         </p>
       </div>
+
+      {/* AI Category */}
+      {analysis.category && (
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-medium text-gray-500">Tagged as:</span>
+          <span className="rounded-full bg-indigo-100 px-3 py-1 text-xs font-medium text-indigo-800">
+            {analysis.category}
+          </span>
+        </div>
+      )}
 
       {/* Summary */}
       <ExpandableSection title="Summary" defaultOpen>

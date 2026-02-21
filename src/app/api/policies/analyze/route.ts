@@ -27,6 +27,7 @@ interface AnalysisResult {
   missingElements: string[];
   suggestions: string[];
   summary: string;
+  category: string;
 }
 
 export async function POST(request: NextRequest) {
@@ -96,6 +97,7 @@ The JSON must have exactly these fields:
 - "missingElements": array of strings identifying missing policy elements such as budget/funding, implementation timeline, enforcement mechanisms, success metrics, sunset clauses, or oversight provisions
 - "suggestions": array of 3 to 5 strings with concrete improvements for clarity and completeness
 - "summary": a 2-3 sentence overview of what this policy does and its key implications
+- "category": the single best category for this policy — must be exactly one of: "Housing", "Healthcare", "Education", "Environment", "Transportation", "Criminal Justice", "Economic Policy", "Civil Rights", or "Other"
 ${targetLawSection}
 
 <policy>

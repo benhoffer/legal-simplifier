@@ -4,8 +4,6 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useUser } from "@clerk/nextjs";
 
-const clerkEnabled = !!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
-
 interface AdminOrg {
   id: string;
   name: string;
@@ -19,8 +17,6 @@ interface EndorseButtonProps {
 }
 
 function useClerkSignedIn() {
-  if (!clerkEnabled) return { isSignedIn: true, isLoaded: true };
-  // eslint-disable-next-line react-hooks/rules-of-hooks
   const { isSignedIn, isLoaded } = useUser();
   return { isSignedIn: isSignedIn ?? false, isLoaded: isLoaded ?? false };
 }

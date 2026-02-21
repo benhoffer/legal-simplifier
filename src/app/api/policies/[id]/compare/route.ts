@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { auth } from "@clerk/nextjs/server";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 
@@ -16,10 +17,18 @@ export async function POST(
 ) {
   const { id: policyId } = await params;
 
-  try {
-    const body = await request.json();
-    const { existingLawText } = body;
+  const { userId: clerkId } = await auth();
+  if (!clerkId) {
+    return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
+  }
 
+  try {
+    const dbUser = await prisma.user.findUnique({ where: { clerkId } });
+    if (!dbUser) {
+      return NextResponse.json({ error: "User not found." }, { status: 404 });
+    }
+
+    // Load the primary policy
     const policy = await prisma.policy.findUnique({
       where: { id: policyId, deletedAt: null, published: true },
       select: {
@@ -28,24 +37,73 @@ export async function POST(
         content: true,
         targetLawText: true,
         targetLawName: true,
+        organizationId: true,
       },
     });
 
     if (!policy) {
+      return NextResponse.json({ error: "Policy not found." }, { status: 404 });
+    }
+
+    // Determine the user's accessible org IDs (memberships + parent orgs)
+    const memberships = await prisma.organizationMember.findMany({
+      where: { userId: dbUser.id },
+      include: { organization: { select: { id: true, parentId: true } } },
+    });
+
+    const accessibleOrgIds = new Set<string>();
+    for (const m of memberships) {
+      accessibleOrgIds.add(m.organizationId);
+      if (m.organization.parentId) accessibleOrgIds.add(m.organization.parentId);
+    }
+
+    // Verify user can access the primary policy
+    if (policy.organizationId && !accessibleOrgIds.has(policy.organizationId)) {
       return NextResponse.json(
-        { error: "Policy not found." },
-        { status: 404 }
+        { error: "You don't have access to this policy." },
+        { status: 403 }
       );
     }
 
-    const lawText =
-      existingLawText && typeof existingLawText === "string"
-        ? existingLawText.trim()
-        : policy.targetLawText?.trim();
+    const body = await request.json();
+    const { comparePolicyId } = body as { comparePolicyId?: string };
 
-    if (!lawText) {
+    let lawText: string;
+    let lawLabel: string;
+
+    if (comparePolicyId) {
+      // Load the comparison policy from the DB and check access
+      const comparePolicy = await prisma.policy.findUnique({
+        where: { id: comparePolicyId, deletedAt: null, published: true },
+        select: { id: true, title: true, content: true, organizationId: true },
+      });
+
+      if (!comparePolicy) {
+        return NextResponse.json(
+          { error: "Comparison policy not found." },
+          { status: 404 }
+        );
+      }
+
+      if (
+        comparePolicy.organizationId &&
+        !accessibleOrgIds.has(comparePolicy.organizationId)
+      ) {
+        return NextResponse.json(
+          { error: "You don't have access to the comparison policy." },
+          { status: 403 }
+        );
+      }
+
+      lawText = comparePolicy.content;
+      lawLabel = comparePolicy.title;
+    } else if (policy.targetLawText) {
+      // Fall back to the stored reference text (backward compat)
+      lawText = policy.targetLawText;
+      lawLabel = policy.targetLawName || "Reference Law";
+    } else {
       return NextResponse.json(
-        { error: "No existing law text provided for comparison." },
+        { error: "No comparison target specified." },
         { status: 400 }
       );
     }
@@ -110,7 +168,7 @@ ${policy.content}
       );
     }
 
-    return NextResponse.json({ comparison });
+    return NextResponse.json({ comparison, lawLabel });
   } catch (error) {
     console.error("POST /api/policies/[id]/compare error:", error);
 

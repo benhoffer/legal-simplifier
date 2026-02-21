@@ -41,10 +41,10 @@ export async function GET(
   }
 }
 
-// ── POST: Join organization ─────────────────────────────────────────────────
+// ── POST: Request access to organization ────────────────────────────────────
 
 export async function POST(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id: orgId } = await params;
@@ -52,7 +52,7 @@ export async function POST(
   const { userId: clerkId } = await auth();
   if (!clerkId) {
     return NextResponse.json(
-      { error: "You must be signed in to join." },
+      { error: "You must be signed in to request access." },
       { status: 401 }
     );
   }
@@ -101,22 +101,49 @@ export async function POST(
       );
     }
 
-    const member = await prisma.organizationMember.create({
-      data: {
-        userId: dbUser.id,
-        organizationId: orgId,
-        role: "member",
-      },
-      include: {
-        user: { select: { id: true, name: true, email: true } },
+    // Check if already has a pending request
+    const existingRequest = await prisma.accessRequest.findUnique({
+      where: {
+        userId_organizationId: { userId: dbUser.id, organizationId: orgId },
       },
     });
 
-    return NextResponse.json({ member }, { status: 201 });
+    if (existingRequest) {
+      if (existingRequest.status === "pending") {
+        return NextResponse.json(
+          { error: "You already have a pending request." },
+          { status: 400 }
+        );
+      }
+      // If previously denied, allow re-requesting by updating it
+      const body = await request.json().catch(() => ({}));
+      const updated = await prisma.accessRequest.update({
+        where: { id: existingRequest.id },
+        data: {
+          status: "pending",
+          message: body.message?.trim() || null,
+          reviewedAt: null,
+          reviewedById: null,
+        },
+      });
+      return NextResponse.json({ requested: true, request: updated }, { status: 202 });
+    }
+
+    const body = await request.json().catch(() => ({}));
+    const accessRequest = await prisma.accessRequest.create({
+      data: {
+        userId: dbUser.id,
+        organizationId: orgId,
+        status: "pending",
+        message: body.message?.trim() || null,
+      },
+    });
+
+    return NextResponse.json({ requested: true, request: accessRequest }, { status: 202 });
   } catch (error) {
     console.error("POST /api/organizations/[id]/members error:", error);
     return NextResponse.json(
-      { error: "Failed to join organization." },
+      { error: "Failed to request access." },
       { status: 500 }
     );
   }

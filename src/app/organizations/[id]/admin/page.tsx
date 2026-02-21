@@ -12,6 +12,14 @@ interface Member {
   user: { id: string; name: string | null; email: string; location: string | null };
 }
 
+interface AccessRequest {
+  id: string;
+  status: string;
+  message: string | null;
+  createdAt: string;
+  user: { id: string; name: string | null; email: string };
+}
+
 interface OrgInfo {
   id: string;
   name: string;
@@ -27,6 +35,7 @@ export default function OrgAdminPage() {
 
   const [org, setOrg] = useState<OrgInfo | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
+  const [accessRequests, setAccessRequests] = useState<AccessRequest[]>([]);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [toast, setToast] = useState("");
@@ -48,8 +57,9 @@ export default function OrgAdminPage() {
     Promise.all([
       fetch(`/api/organizations/${id}`).then((r) => (r.ok ? r.json() : null)),
       fetch(`/api/organizations/${id}/members`).then((r) => (r.ok ? r.json() : null)),
+      fetch(`/api/organizations/${id}/access-requests?status=pending`).then((r) => (r.ok ? r.json() : null)),
     ])
-      .then(([orgData, memberData]) => {
+      .then(([orgData, memberData, requestData]) => {
         if (!orgData || !orgData.membership || orgData.membership.role !== "admin") {
           router.push(`/organizations/${id}`);
           return;
@@ -61,6 +71,7 @@ export default function OrgAdminPage() {
         setEditWebsite(orgData.organization.website || "");
 
         if (memberData) setMembers(memberData.members);
+        if (requestData) setAccessRequests(requestData.requests);
       })
       .catch(() => router.push(`/organizations/${id}`))
       .finally(() => setIsLoading(false));
@@ -91,6 +102,32 @@ export default function OrgAdminPage() {
       showToast("Could not connect to the server.");
     } finally {
       setIsSaving(false);
+    }
+  }
+
+  async function handleReviewRequest(requestId: string, action: "approve" | "deny") {
+    try {
+      const res = await fetch(`/api/organizations/${id}/access-requests`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ requestId, action }),
+      });
+      if (res.ok) {
+        setAccessRequests((prev) => prev.filter((r) => r.id !== requestId));
+        if (action === "approve") {
+          setOrg((prev) =>
+            prev
+              ? { ...prev, _count: { ...prev._count, members: prev._count.members + 1 } }
+              : prev
+          );
+        }
+        showToast(action === "approve" ? "Request approved." : "Request denied.");
+      } else {
+        const data = await res.json();
+        showToast(data.error || "Failed to review request.");
+      }
+    } catch {
+      showToast("Could not connect to the server.");
     }
   }
 
@@ -243,6 +280,50 @@ export default function OrgAdminPage() {
               </li>
             ))}
           </ul>
+        </section>
+
+        {/* ── Access Requests ── */}
+        <section className="mt-8 rounded-lg border border-gray-200 bg-white p-6">
+          <h2 className="text-lg font-semibold text-gray-900">
+            Access Requests ({accessRequests.length})
+          </h2>
+          {accessRequests.length === 0 ? (
+            <p className="mt-4 text-sm text-gray-400">No pending requests.</p>
+          ) : (
+            <ul className="mt-4 divide-y divide-gray-100">
+              {accessRequests.map((req) => (
+                <li key={req.id} className="flex items-center justify-between py-3">
+                  <div>
+                    <span className="text-sm font-medium text-gray-900">
+                      {req.user.name ?? req.user.email}
+                    </span>
+                    <span className="ml-2 text-xs text-gray-400">
+                      {new Date(req.createdAt).toLocaleDateString()}
+                    </span>
+                    {req.message && (
+                      <p className="mt-0.5 text-xs text-gray-500">{req.message}</p>
+                    )}
+                  </div>
+                  <div className="flex gap-3">
+                    <button
+                      type="button"
+                      onClick={() => handleReviewRequest(req.id, "approve")}
+                      className="text-xs font-medium text-green-600 hover:text-green-700"
+                    >
+                      Approve
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleReviewRequest(req.id, "deny")}
+                      className="text-xs text-gray-400 hover:text-red-500"
+                    >
+                      Deny
+                    </button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
         </section>
 
         {/* ── Stats ── */}

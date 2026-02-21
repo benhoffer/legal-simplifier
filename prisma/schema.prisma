@@ -21,6 +21,8 @@ model User {
   petitionSignatures      PetitionSignature[]
   comments                Comment[]
   organizationMemberships OrganizationMember[]
+  accessRequests          AccessRequest[]
+  reviewedAccessRequests  AccessRequest[]      @relation("RequestReviewer")
 
   @@index([clerkId])
 }
@@ -134,9 +136,36 @@ model Organization {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  policies     Policy[]
-  endorsements Endorsement[]
-  members      OrganizationMember[]
+  parentId     String?
+  parent       Organization?  @relation("OrgHierarchy", fields: [parentId], references: [id])
+  children     Organization[] @relation("OrgHierarchy")
+
+  policies       Policy[]
+  endorsements   Endorsement[]
+  members        OrganizationMember[]
+  accessRequests AccessRequest[]
+}
+
+model AccessRequest {
+  id             String    @id @default(cuid())
+  status         String    @default("pending")
+  message        String?   @db.Text
+  reviewedAt     DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  userId         String
+  user           User         @relation(fields: [userId], references: [id])
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+
+  reviewedById   String?
+  reviewedBy     User?        @relation("RequestReviewer", fields: [reviewedById], references: [id])
+
+  @@unique([userId, organizationId])
+  @@index([organizationId, status])
+  @@index([userId])
 }
 
 model OrganizationMember {

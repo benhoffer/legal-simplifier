@@ -10,13 +10,6 @@ import { PetitionProgress } from "@/components/PetitionProgress";
 import { CommentSection } from "@/components/CommentSection";
 import { DetailPageSkeleton } from "@/components/Skeleton";
 
-const clerkEnabled = !!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
-
-const READING_LEVELS = [
-  { value: "5th grade", label: "5th Grade" },
-  { value: "high school", label: "High School" },
-  { value: "college", label: "College" },
-] as const;
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -93,8 +86,6 @@ function scoreColor(score: number): string {
 }
 
 function useCurrentClerkId(): string | null {
-  if (!clerkEnabled) return null;
-  // eslint-disable-next-line react-hooks/rules-of-hooks
   const { user } = useUser();
   return user?.id ?? null;
 }
@@ -117,12 +108,6 @@ export default function PolicyDetailPage() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // Simplify modal state
-  const [showSimplify, setShowSimplify] = useState(false);
-  const [readingLevel, setReadingLevel] = useState("high school");
-  const [simplified, setSimplified] = useState("");
-  const [isSimplifying, setIsSimplifying] = useState(false);
-  const [simplifyError, setSimplifyError] = useState("");
 
   // Petition signatures
   const [signatures, setSignatures] = useState<Signer[]>([]);
@@ -194,30 +179,6 @@ export default function PolicyDetailPage() {
     }
   }
 
-  async function handleSimplify() {
-    if (!policy) return;
-    setSimplifyError("");
-    setSimplified("");
-    setIsSimplifying(true);
-
-    try {
-      const res = await fetch("/api/simplify", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: policy.content, readingLevel }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setSimplifyError(data.error || "Failed to simplify.");
-        return;
-      }
-      setSimplified(data.simplified);
-    } catch {
-      setSimplifyError("Could not connect to the server.");
-    } finally {
-      setIsSimplifying(false);
-    }
-  }
 
   // ─── Loading ─────────────────────────────────────────────────────────────
 
@@ -460,17 +421,12 @@ export default function PolicyDetailPage() {
 
         {/* ── ACTIONS ROW ── */}
         <div className="mt-6 flex flex-wrap gap-3">
-          <button
-            type="button"
-            onClick={() => {
-              setSimplified("");
-              setSimplifyError("");
-              setShowSimplify(true);
-            }}
+          <Link
+            href="/"
             className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
           >
-            Simplify This Policy
-          </button>
+            Analyze in Workspace
+          </Link>
 
           {policy.targetLawText && (
             <Link
@@ -620,107 +576,6 @@ export default function PolicyDetailPage() {
         </div>
       )}
 
-      {/* ── SIMPLIFY MODAL ── */}
-      {showSimplify && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
-          onClick={() => !isSimplifying && setShowSimplify(false)}
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="simplify-title"
-        >
-          <div
-            className="flex max-h-[90vh] w-full max-w-4xl flex-col rounded-xl bg-white shadow-xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Header */}
-            <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
-              <h2
-                id="simplify-title"
-                className="text-lg font-semibold text-gray-900"
-              >
-                Simplify Policy
-              </h2>
-              <button
-                type="button"
-                onClick={() => setShowSimplify(false)}
-                className="text-gray-400 hover:text-gray-600"
-                aria-label="Close"
-              >
-                &#10005;
-              </button>
-            </div>
-
-            {/* Controls */}
-            <div className="flex flex-wrap items-center gap-3 border-b border-gray-200 px-6 py-3">
-              <span className="text-sm font-medium text-gray-700">
-                Reading level:
-              </span>
-              {READING_LEVELS.map((level) => (
-                <button
-                  key={level.value}
-                  type="button"
-                  onClick={() => {
-                    setReadingLevel(level.value);
-                    setSimplified("");
-                  }}
-                  className={`rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors ${
-                    readingLevel === level.value
-                      ? "border-blue-600 bg-blue-600 text-white"
-                      : "border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
-                  }`}
-                >
-                  {level.label}
-                </button>
-              ))}
-              <button
-                type="button"
-                onClick={handleSimplify}
-                disabled={isSimplifying}
-                className="ml-auto inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
-              >
-                {isSimplifying && <Spinner />}
-                {isSimplifying ? "Simplifying..." : "Simplify"}
-              </button>
-            </div>
-
-            {/* Side-by-side */}
-            <div className="grid flex-1 gap-0 overflow-auto sm:grid-cols-2">
-              {/* Original */}
-              <div className="border-b border-gray-200 p-4 sm:border-b-0 sm:border-r">
-                <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
-                  Original
-                </h3>
-                <div className="whitespace-pre-wrap text-sm leading-relaxed text-gray-700">
-                  {policy.content}
-                </div>
-              </div>
-
-              {/* Simplified */}
-              <div className="p-4">
-                <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
-                  Simplified
-                </h3>
-                {simplifyError ? (
-                  <p className="text-sm text-red-600">{simplifyError}</p>
-                ) : isSimplifying ? (
-                  <div className="flex items-center gap-2 text-sm text-gray-500">
-                    <Spinner /> Simplifying...
-                  </div>
-                ) : simplified ? (
-                  <div className="whitespace-pre-wrap text-sm leading-relaxed text-gray-700">
-                    {simplified}
-                  </div>
-                ) : (
-                  <p className="text-sm italic text-gray-400">
-                    Select a reading level and click Simplify.
-                  </p>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

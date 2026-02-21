@@ -5,8 +5,6 @@ import { useUser } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import { Comment, type CommentData } from "@/components/Comment";
 
-const clerkEnabled = !!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
-
 type SortMode = "newest" | "popular" | "controversial";
 
 const SORT_OPTIONS: { value: SortMode; label: string }[] = [
@@ -21,10 +19,6 @@ interface CommentSectionProps {
 }
 
 function useCurrentClerk() {
-  if (!clerkEnabled) {
-    return { clerkId: "demo-user", isSignedIn: true, isLoaded: true };
-  }
-  // eslint-disable-next-line react-hooks/rules-of-hooks
   const { user, isSignedIn, isLoaded } = useUser();
   return { clerkId: user?.id ?? null, isSignedIn: isSignedIn ?? false, isLoaded: isLoaded ?? false };
 }

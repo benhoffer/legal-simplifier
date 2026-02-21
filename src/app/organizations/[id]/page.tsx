@@ -45,11 +45,12 @@ export default function OrganizationPage() {
 
   const [org, setOrg] = useState<OrgDetail | null>(null);
   const [membership, setMembership] = useState<{ role: string } | null>(null);
+  const [pendingRequest, setPendingRequest] = useState<{ status: string } | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
   const [tab, setTab] = useState<Tab>("policies");
-  const [isJoining, setIsJoining] = useState(false);
+  const [isRequesting, setIsRequesting] = useState(false);
   const [toast, setToast] = useState("");
 
   const isAdmin = membership?.role === "admin";
@@ -68,6 +69,7 @@ export default function OrganizationPage() {
       const data = await res.json();
       setOrg(data.organization);
       setMembership(data.membership);
+      setPendingRequest(data.pendingRequest ?? null);
     } catch {
       setError("Failed to load organization.");
     } finally {
@@ -90,8 +92,8 @@ export default function OrganizationPage() {
       .catch(() => {});
   }, [tab, id]);
 
-  async function handleJoin() {
-    setIsJoining(true);
+  async function handleRequestAccess() {
+    setIsRequesting(true);
     try {
       const res = await fetch(`/api/organizations/${id}/members`, {
         method: "POST",
@@ -101,24 +103,19 @@ export default function OrganizationPage() {
         return;
       }
       const data = await res.json();
-      if (res.ok) {
-        setMembership({ role: "member" });
-        setOrg((prev) =>
-          prev
-            ? { ...prev, _count: { ...prev._count, members: prev._count.members + 1 } }
-            : prev
-        );
-        setToast("You have joined the organization!");
-        setTimeout(() => setToast(""), 3000);
+      if (res.ok || res.status === 202) {
+        setPendingRequest({ status: "pending" });
+        setToast("Access request sent! An admin will review it shortly.");
+        setTimeout(() => setToast(""), 4000);
       } else {
-        setToast(data.error || "Failed to join.");
+        setToast(data.error || "Failed to send request.");
         setTimeout(() => setToast(""), 3000);
       }
     } catch {
       setToast("Could not connect to the server.");
       setTimeout(() => setToast(""), 3000);
     } finally {
-      setIsJoining(false);
+      setIsRequesting(false);
     }
   }
 
@@ -221,14 +218,20 @@ export default function OrganizationPage() {
         {/* ── Action buttons ── */}
         <div className="mt-4 flex flex-wrap gap-3">
           {!isMember ? (
-            <button
-              type="button"
-              onClick={handleJoin}
-              disabled={isJoining}
-              className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50"
-            >
-              {isJoining ? "Joining..." : "Join Organization"}
-            </button>
+            pendingRequest?.status === "pending" ? (
+              <span className="inline-flex items-center rounded-lg border border-gray-200 bg-gray-50 px-4 py-2 text-sm font-medium text-gray-500">
+                Request Pending
+              </span>
+            ) : (
+              <button
+                type="button"
+                onClick={handleRequestAccess}
+                disabled={isRequesting}
+                className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50"
+              >
+                {isRequesting ? "Requesting..." : "Request Access"}
+              </button>
+            )
           ) : (
             <>
               {isAdmin && (

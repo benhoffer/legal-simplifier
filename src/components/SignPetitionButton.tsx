@@ -4,8 +4,6 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { useUser } from "@clerk/nextjs";
 
-const clerkEnabled = !!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
-
 interface SignPetitionButtonProps {
   policyId: string;
   initialSigned: boolean;
@@ -14,14 +12,6 @@ interface SignPetitionButtonProps {
 }
 
 function useClerkUser() {
-  if (!clerkEnabled) {
-    return {
-      isSignedIn: true,
-      isLoaded: true,
-      fullName: "Demo User",
-    };
-  }
-  // eslint-disable-next-line react-hooks/rules-of-hooks
   const { isSignedIn, isLoaded, user } = useUser();
   const fullName =
     user?.firstName && user?.lastName

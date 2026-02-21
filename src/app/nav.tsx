@@ -3,20 +3,13 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
-import {
-  SignedIn,
-  SignedOut,
-  SignInButton,
-  UserButton,
-} from "@clerk/nextjs";
+import { SignedIn, SignedOut, UserButton } from "@clerk/nextjs";
 
 const links = [
-  { href: "/", label: "Simplifier" },
+  { href: "/", label: "Analysis" },
   { href: "/policies", label: "Policies" },
   { href: "/organizations", label: "Organizations" },
 ];
-
-const clerkEnabled = !!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
 
 export function Nav() {
   const pathname = usePathname();
@@ -46,32 +39,26 @@ export function Nav() {
             );
           })}
         </nav>
-        {clerkEnabled && (
-          <div className="ml-2 border-l border-gray-200 pl-3">
-            <SignedIn>
-              <UserButton />
-            </SignedIn>
-            <SignedOut>
-              <SignInButton mode="modal">
-                <button
-                  type="button"
-                  className="rounded-lg bg-blue-600 px-4 py-1.5 text-sm font-medium text-white transition-colors hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-                >
-                  Sign In
-                </button>
-              </SignInButton>
-            </SignedOut>
-          </div>
-        )}
+        <div className="ml-2 border-l border-gray-200 pl-3">
+          <SignedIn>
+            <UserButton />
+          </SignedIn>
+          <SignedOut>
+            <Link
+              href="/sign-in"
+              className="rounded-lg bg-blue-600 px-4 py-1.5 text-sm font-medium text-white transition-colors hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+            >
+              Sign In
+            </Link>
+          </SignedOut>
+        </div>
       </div>
 
       {/* Mobile hamburger */}
       <div className="flex items-center gap-3 sm:hidden">
-        {clerkEnabled && (
-          <SignedIn>
-            <UserButton />
-          </SignedIn>
-        )}
+        <SignedIn>
+          <UserButton />
+        </SignedIn>
         <button
           type="button"
           onClick={() => setMobileOpen(!mobileOpen)}
@@ -114,20 +101,17 @@ export function Nav() {
                 </Link>
               );
             })}
-            {clerkEnabled && (
-              <SignedOut>
-                <div className="mt-2 border-t border-gray-100 pt-2">
-                  <SignInButton mode="modal">
-                    <button
-                      type="button"
-                      className="w-full rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-                    >
-                      Sign In
-                    </button>
-                  </SignInButton>
-                </div>
-              </SignedOut>
-            )}
+            <SignedOut>
+              <div className="mt-2 border-t border-gray-100 pt-2">
+                <Link
+                  href="/sign-in"
+                  onClick={() => setMobileOpen(false)}
+                  className="block w-full rounded-lg bg-blue-600 px-4 py-2.5 text-center text-sm font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                >
+                  Sign In
+                </Link>
+              </div>
+            </SignedOut>
           </nav>
         </div>
       )}
