@@ -36,6 +36,7 @@ export default function OrgAdminPage() {
   const [org, setOrg] = useState<OrgInfo | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
   const [accessRequests, setAccessRequests] = useState<AccessRequest[]>([]);
+  const [accessRequestsError, setAccessRequestsError] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [toast, setToast] = useState("");
@@ -51,15 +52,26 @@ export default function OrgAdminPage() {
     setTimeout(() => setToast(""), 3000);
   }, []);
 
+  const fetchAccessRequests = useCallback(async () => {
+    setAccessRequestsError(false);
+    try {
+      const res = await fetch(`/api/organizations/${id}/access-requests?status=pending`);
+      if (!res.ok) throw new Error(`${res.status}`);
+      const data = await res.json();
+      setAccessRequests(data.requests);
+    } catch {
+      setAccessRequestsError(true);
+    }
+  }, [id]);
+
   useEffect(() => {
     setIsLoading(true);
 
     Promise.all([
       fetch(`/api/organizations/${id}`).then((r) => (r.ok ? r.json() : null)),
       fetch(`/api/organizations/${id}/members`).then((r) => (r.ok ? r.json() : null)),
-      fetch(`/api/organizations/${id}/access-requests?status=pending`).then((r) => (r.ok ? r.json() : null)),
     ])
-      .then(([orgData, memberData, requestData]) => {
+      .then(([orgData, memberData]) => {
         if (!orgData || !orgData.membership || orgData.membership.role !== "admin") {
           router.push(`/organizations/${id}`);
           return;
@@ -71,11 +83,12 @@ export default function OrgAdminPage() {
         setEditWebsite(orgData.organization.website || "");
 
         if (memberData) setMembers(memberData.members);
-        if (requestData) setAccessRequests(requestData.requests);
+
+        return fetchAccessRequests();
       })
       .catch(() => router.push(`/organizations/${id}`))
       .finally(() => setIsLoading(false));
-  }, [id, router]);
+  }, [id, router, fetchAccessRequests]);
 
   async function handleSave() {
     setIsSaving(true);
@@ -284,10 +297,30 @@ export default function OrgAdminPage() {
 
         {/* ── Access Requests ── */}
         <section className="mt-8 rounded-lg border border-gray-200 bg-white p-6">
-          <h2 className="text-lg font-semibold text-gray-900">
-            Access Requests ({accessRequests.length})
-          </h2>
-          {accessRequests.length === 0 ? (
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-gray-900">
+              Access Requests ({accessRequests.length})
+            </h2>
+            <button
+              type="button"
+              onClick={fetchAccessRequests}
+              className="text-xs text-blue-600 hover:text-blue-700"
+            >
+              Refresh
+            </button>
+          </div>
+          {accessRequestsError ? (
+            <div className="mt-4 flex items-center gap-3">
+              <p className="text-sm text-red-500">Failed to load requests.</p>
+              <button
+                type="button"
+                onClick={fetchAccessRequests}
+                className="text-sm font-medium text-blue-600 hover:text-blue-700"
+              >
+                Retry
+              </button>
+            </div>
+          ) : accessRequests.length === 0 ? (
             <p className="mt-4 text-sm text-gray-400">No pending requests.</p>
           ) : (
             <ul className="mt-4 divide-y divide-gray-100">
@@ -327,6 +360,7 @@ export default function OrgAdminPage() {
         </section>
 
         {/* ── Stats ── */}
+
         <section className="mt-8 rounded-lg border border-gray-200 bg-white p-6">
           <h2 className="text-lg font-semibold text-gray-900">Stats</h2>
           <div className="mt-4 grid grid-cols-3 gap-4 text-center">

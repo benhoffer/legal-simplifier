@@ -46,6 +46,7 @@ export default function OrganizationPage() {
   const [org, setOrg] = useState<OrgDetail | null>(null);
   const [membership, setMembership] = useState<{ role: string } | null>(null);
   const [pendingRequest, setPendingRequest] = useState<{ status: string } | null>(null);
+  const [pendingRequestCount, setPendingRequestCount] = useState(0);
   const [members, setMembers] = useState<Member[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
@@ -70,6 +71,7 @@ export default function OrganizationPage() {
       setOrg(data.organization);
       setMembership(data.membership);
       setPendingRequest(data.pendingRequest ?? null);
+      setPendingRequestCount(data.pendingRequestCount ?? 0);
     } catch {
       setError("Failed to load organization.");
     } finally {
@@ -237,9 +239,14 @@ export default function OrganizationPage() {
               {isAdmin && (
                 <Link
                   href={`/organizations/${org.id}/admin`}
-                  className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
                 >
                   Admin Dashboard
+                  {pendingRequestCount > 0 && (
+                    <span className="rounded-full bg-red-500 px-1.5 py-0.5 text-xs font-bold text-white">
+                      {pendingRequestCount}
+                    </span>
+                  )}
                 </Link>
               )}
               {!isAdmin && (

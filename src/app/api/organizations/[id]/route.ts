@@ -50,6 +50,7 @@ export async function GET(
     // Check if current user is a member or has a pending request
     let membership = null;
     let pendingRequest = null;
+    let pendingRequestCount = 0;
     try {
       const { userId: clerkId } = await auth();
       if (clerkId) {
@@ -75,13 +76,19 @@ export async function GET(
               select: { status: true },
             }),
           ]);
+
+          if (membership?.role === "admin") {
+            pendingRequestCount = await prisma.accessRequest.count({
+              where: { organizationId: id, status: "pending" },
+            });
+          }
         }
       }
     } catch {
       // Auth not available, that's fine
     }
 
-    return NextResponse.json({ organization, membership, pendingRequest });
+    return NextResponse.json({ organization, membership, pendingRequest, pendingRequestCount });
   } catch (error) {
     console.error("GET /api/organizations/[id] error:", error);
     return NextResponse.json(
